@@ -40,8 +40,6 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 
 namespace tesseract_planning
 {
-class TaskComposerKeys;
-
 /** @brief A thread save data storage */
 class TaskComposerDataStorage
 {
@@ -51,7 +49,7 @@ public:
   using UPtr = std::unique_ptr<TaskComposerDataStorage>;
   using ConstUPtr = std::unique_ptr<const TaskComposerDataStorage>;
 
-  TaskComposerDataStorage(std::string name = "");
+  TaskComposerDataStorage() = default;
   ~TaskComposerDataStorage() = default;
   TaskComposerDataStorage(const TaskComposerDataStorage&);
   TaskComposerDataStorage& operator=(const TaskComposerDataStorage&);
@@ -113,26 +111,6 @@ public:
    */
   bool remapData(const std::map<std::string, std::string>& remapping, bool copy = false);
 
-  /**
-   * @brief Copy data as input data from the specified keys from another data storage
-   * @param data_storage The input data storage from which to copy data
-   * @param keys The keys from which to copy data from the input data storage
-   * @param override_keys The override keys if any when looking up data
-   */
-  void copyAsInputData(const TaskComposerDataStorage& data_storage,
-                       const TaskComposerKeys& keys,
-                       const TaskComposerKeys& override_keys);
-
-  /**
-   * @brief Copy data as output data from the specified keys from another data storage
-   * @param data_storage The input data storage from which to copy data
-   * @param keys The keys from which to copy data from the input data storage
-   * @param override_keys The override keys to use if any when storing data
-   */
-  void copyAsOutputData(const TaskComposerDataStorage& data_storage,
-                        const TaskComposerKeys& keys,
-                        const TaskComposerKeys& override_keys);
-
   bool operator==(const TaskComposerDataStorage& rhs) const;
   bool operator!=(const TaskComposerDataStorage& rhs) const;
 
@@ -147,12 +125,6 @@ private:
   void serialize(Archive& ar, const unsigned int version);  // NOLINT
 };
 
-using TaskComposerDataStoragePtrAnyPoly = tesseract_common::AnyWrapper<TaskComposerDataStorage::Ptr>;
-
 }  // namespace tesseract_planning
 BOOST_CLASS_EXPORT_KEY(tesseract_planning::TaskComposerDataStorage)
-
-BOOST_CLASS_EXPORT_KEY(tesseract_planning::TaskComposerDataStoragePtrAnyPoly)
-BOOST_CLASS_TRACKING(tesseract_planning::TaskComposerDataStoragePtrAnyPoly, boost::serialization::track_never)
-
 #endif  // TESSERACT_TASK_COMPOSER_TASK_COMPOSER_DATA_STORAGE_H

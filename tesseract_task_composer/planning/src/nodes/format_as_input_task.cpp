@@ -31,7 +31,6 @@
 TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
 #include <console_bridge/console.h>
 #include <boost/serialization/string.hpp>
-#include <boost/uuid/uuid_io.hpp>
 
 #include <tesseract_common/joint_state.h>
 #include <tesseract_common/serialization.h>
@@ -99,7 +98,7 @@ TaskComposerNodeInfo FormatAsInputTask::runImpl(TaskComposerContext& context,
   // --------------------
   // Check that inputs are valid
   // --------------------
-  auto input_formatted_data_poly = getData(context, INPUT_PRE_PLANNING_PROGRAM_PORT);
+  auto input_formatted_data_poly = getData(*context.data_storage, INPUT_PRE_PLANNING_PROGRAM_PORT);
   if (input_formatted_data_poly.getType() != std::type_index(typeid(CompositeInstruction)))
   {
     info.status_message = "Input '" + input_keys_.get(INPUT_PRE_PLANNING_PROGRAM_PORT) +
@@ -108,7 +107,7 @@ TaskComposerNodeInfo FormatAsInputTask::runImpl(TaskComposerContext& context,
     return info;
   }
 
-  auto input_unformatted_data_poly = getData(context, INPUT_POST_PLANNING_PROGRAM_PORT);
+  auto input_unformatted_data_poly = getData(*context.data_storage, INPUT_POST_PLANNING_PROGRAM_PORT);
   if (input_unformatted_data_poly.getType() != std::type_index(typeid(CompositeInstruction)))
   {
     info.status_message = "Input '" + input_keys_.get(INPUT_POST_PLANNING_PROGRAM_PORT) +
@@ -159,7 +158,7 @@ TaskComposerNodeInfo FormatAsInputTask::runImpl(TaskComposerContext& context,
     }
   }
 
-  setData(context, OUTPUT_PROGRAM_PORT, input_formatted_data_poly);
+  setData(*context.data_storage, OUTPUT_PROGRAM_PORT, input_formatted_data_poly);
 
   info.color = "green";
   info.status_code = 1;

@@ -40,8 +40,7 @@ public:
                        std::shared_ptr<tesseract_visualization::Visualization> plotter = nullptr,
                        double range = 0.01,
                        double planning_time = 60.0,
-                       bool debug = false,
-                       bool benchmark = false);
+                       bool debug = false);
   ~FreespaceOMPLExample() override = default;
   FreespaceOMPLExample(const FreespaceOMPLExample&) = default;
   FreespaceOMPLExample& operator=(const FreespaceOMPLExample&) = default;
@@ -54,7 +53,6 @@ private:
   double range_;
   double planning_time_;
   bool debug_;
-  bool benchmark_;
 };
 
 }  // namespace tesseract_examples

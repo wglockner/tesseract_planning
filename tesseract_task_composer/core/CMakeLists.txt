@@ -16,8 +16,7 @@ add_library(
   src/task_composer_pipeline.cpp
   src/task_composer_plugin_factory.cpp
   src/task_composer_server.cpp
-  src/task_composer_task.cpp
-  src/yaml_utils.cpp)
+  src/task_composer_task.cpp)
 
 target_link_libraries(
   ${PROJECT_NAME}
@@ -50,7 +49,6 @@ add_library(
   ${PROJECT_NAME}_nodes
   src/nodes/done_task.cpp
   src/nodes/error_task.cpp
-  src/nodes/for_each_task.cpp
   src/nodes/has_data_storage_entry_task.cpp
   src/nodes/remap_task.cpp
   src/nodes/start_task.cpp

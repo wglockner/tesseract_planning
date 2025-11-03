@@ -104,7 +104,7 @@ public:
   /** @brief The node uuid */
   const boost::uuids::uuid& getUUID() const;
 
-  /** @brief The node uuid string*/
+  /** @brief The node uuid */
   const std::string& getUUIDString() const;
 
   /**
@@ -112,9 +112,6 @@ public:
    * @details This is not null if the node is part of a graph
    */
   const boost::uuids::uuid& getParentUUID() const;
-
-  /** @brief The UUID string of this node's parent */
-  const std::string& getParentUUIDString() const;
 
   /**
    * @brief Check if node is conditional
@@ -152,12 +149,11 @@ public:
   /** @brief Generate the Dotgraph and save to file */
   bool saveDotgraph(const std::string& filepath, const ResultsMap& results_map = ResultsMap()) const;  // NOLINT
 
-  /**
-   * @brief A utility function to get the correct data storage
-   * @param context The context
-   * @return The data storage object to use
-   */
-  TaskComposerDataStorage::Ptr getDataStorage(const TaskComposerContext& context) const;
+  /** @brief Rename input keys */
+  virtual void renameInputKeys(const std::map<std::string, std::string>& input_keys);
+
+  /** @brief Rename output keys */
+  virtual void renameOutputKeys(const std::map<std::string, std::string>& output_keys);
 
   /** @brief Set if conditional */
   virtual void setConditional(bool enable);
@@ -201,9 +197,6 @@ protected:
    */
   boost::uuids::uuid parent_uuid_{};
 
-  /** @brief The parent uuid as string */
-  std::string parent_uuid_str_;
-
   /** @brief IDs of nodes (i.e. tasks) that should run after this node */
   std::vector<boost::uuids::uuid> outbound_edges_;
 
@@ -230,26 +223,26 @@ protected:
 
   /**
    * @brief A utility function for extracting data from data storage
-   * @param context The context to retrieve the data storage and data from
+   * @param data_storage The data storage to retrieve data from
    * @param port The port associated with the key
    * @param required Indicate if data is required
    * @return The data stored under the name, if not found and required an exception will be thrown other null
    */
   template <typename T = tesseract_common::AnyPoly>
-  T getData(const TaskComposerContext& context, const std::string& port, bool required = true) const;
+  T getData(const TaskComposerDataStorage& data_storage, const std::string& port, bool required = true) const;
 
   /**
    * @brief A utility function for setting data in data storage
    * @param port The port associated with the key
-   * @param context The context to retrieve the data storage and to assign data to
+   * @param data_storage The data storage to assign data to
    * @param data The data to store
    * @param required Indicate if required port
    */
-  void setData(TaskComposerContext& context,
+  void setData(TaskComposerDataStorage& data_storage,
                const std::string& port,
                tesseract_common::AnyPoly data,
                bool required = true) const;
-  void setData(TaskComposerContext& context,
+  void setData(TaskComposerDataStorage& data_storage,
                const std::string& port,
                const std::vector<tesseract_common::AnyPoly>& data,
                bool required = true) const;

@@ -35,11 +35,6 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 
 #include <tesseract_motion_planners/trajopt_ifopt/profile/trajopt_ifopt_profile.h>
 
-namespace YAML
-{
-class Node;
-}
-
 namespace boost::serialization
 {
 template <class Archive>
@@ -60,7 +55,6 @@ public:
   using ConstPtr = std::shared_ptr<const TrajOptIfoptOSQPSolverProfile>;
 
   TrajOptIfoptOSQPSolverProfile();
-  TrajOptIfoptOSQPSolverProfile(const YAML::Node& config, const tesseract_common::ProfilePluginFactory& plugin_factory);
   TrajOptIfoptOSQPSolverProfile(TrajOptIfoptOSQPSolverProfile&&) = default;
   TrajOptIfoptOSQPSolverProfile& operator=(TrajOptIfoptOSQPSolverProfile&&) = default;
 

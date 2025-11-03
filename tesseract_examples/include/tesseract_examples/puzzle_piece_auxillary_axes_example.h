@@ -29,7 +29,6 @@
 #define TESSERACT_EXAMPLES_PUZZLE_PIECE_AUXILLARY_AXES_EXAMPLE_H
 
 #include <tesseract_examples/example.h>
-#include <memory>
 
 namespace tesseract_examples
 {
@@ -44,8 +43,7 @@ public:
   PuzzlePieceAuxillaryAxesExample(std::shared_ptr<tesseract_environment::Environment> env,
                                   std::shared_ptr<tesseract_visualization::Visualization> plotter = nullptr,
                                   bool ifopt = false,
-                                  bool debug = false,
-                                  bool benchmark = false);
+                                  bool debug = false);
   ~PuzzlePieceAuxillaryAxesExample() override = default;
   PuzzlePieceAuxillaryAxesExample(const PuzzlePieceAuxillaryAxesExample&) = default;
   PuzzlePieceAuxillaryAxesExample& operator=(const PuzzlePieceAuxillaryAxesExample&) = default;
@@ -57,7 +55,6 @@ public:
 private:
   bool ifopt_;
   bool debug_;
-  bool benchmark_;
 };
 
 }  // namespace tesseract_examples

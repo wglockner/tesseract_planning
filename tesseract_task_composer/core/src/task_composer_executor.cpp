@@ -35,7 +35,6 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 #include <tesseract_task_composer/core/task_composer_context.h>
 #include <tesseract_task_composer/core/task_composer_future.h>
 #include <tesseract_task_composer/core/task_composer_node.h>
-#include <tesseract_task_composer/core/task_composer_node_info.h>
 
 namespace tesseract_planning
 {
@@ -44,12 +43,12 @@ TaskComposerExecutor::TaskComposerExecutor(std::string name) : name_(std::move(n
 const std::string& TaskComposerExecutor::getName() const { return name_; }
 
 std::unique_ptr<TaskComposerFuture> TaskComposerExecutor::run(const TaskComposerNode& node,
-                                                              std::shared_ptr<TaskComposerContext> context)
+                                                              std::shared_ptr<TaskComposerDataStorage> data_storage,
+                                                              bool dotgraph)
 {
-  if (context->task_infos->getRootNode().is_nil())
-    context->task_infos->setRootNode(node.getUUID());
-
-  return runImpl(node, std::move(context));
+  auto context = std::make_shared<TaskComposerContext>(node.getName(), std::move(data_storage), dotgraph);
+  context->task_infos.setRootNode(node.getUUID());
+  return run(node, context);
 }
 
 bool TaskComposerExecutor::operator==(const TaskComposerExecutor& rhs) const { return (name_ == rhs.name_); }

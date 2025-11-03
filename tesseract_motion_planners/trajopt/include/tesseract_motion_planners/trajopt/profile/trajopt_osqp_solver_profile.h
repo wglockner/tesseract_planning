@@ -29,11 +29,6 @@
 #include <tesseract_motion_planners/trajopt/profile/trajopt_profile.h>
 #include <trajopt_sco/osqp_interface.hpp>
 
-namespace YAML
-{
-class Node;
-}
-
 namespace boost::serialization
 {
 template <class Archive>
@@ -50,7 +45,6 @@ public:
   using ConstPtr = std::shared_ptr<const TrajOptOSQPSolverProfile>;
 
   TrajOptOSQPSolverProfile();
-  TrajOptOSQPSolverProfile(const YAML::Node& config, const tesseract_common::ProfilePluginFactory& plugin_factory);
 
   OSQPSettings settings{};
 

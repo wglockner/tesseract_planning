@@ -30,7 +30,6 @@ TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
 #include <tesseract_common/plugin_info.h>
 TESSERACT_COMMON_IGNORE_WARNINGS_POP
 
-#include <tesseract_task_composer/core/task_composer_context.h>
 #include <tesseract_task_composer/core/task_composer_server.h>
 #include <tesseract_task_composer/core/task_composer_executor.h>
 #include <tesseract_task_composer/core/task_composer_future.h>
@@ -142,8 +141,7 @@ std::unique_ptr<TaskComposerFuture> TaskComposerServer::run(const std::string& t
     throw std::runtime_error("Task with name '" + task_name + "' does not exist!");
 
   data_storage->setName(task_name);
-  auto context = std::make_shared<TaskComposerContext>(task_name, std::move(data_storage), dotgraph);
-  return e_it->second->run(*t_it->second, std::move(context));
+  return e_it->second->run(*t_it->second, std::move(data_storage), dotgraph);
 }
 
 std::unique_ptr<TaskComposerFuture> TaskComposerServer::run(const TaskComposerNode& node,
@@ -156,8 +154,7 @@ std::unique_ptr<TaskComposerFuture> TaskComposerServer::run(const TaskComposerNo
     throw std::runtime_error("Executor with name '" + executor_name + "' does not exist!");
 
   data_storage->setName(node.getName());
-  auto context = std::make_shared<TaskComposerContext>(node.getName(), std::move(data_storage), dotgraph);
-  return it->second->run(node, context);
+  return it->second->run(node, std::move(data_storage), dotgraph);
 }
 
 long TaskComposerServer::getWorkerCount(const std::string& name) const

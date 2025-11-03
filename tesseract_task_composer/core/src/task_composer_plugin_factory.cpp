@@ -63,15 +63,12 @@ TaskComposerPluginFactory::TaskComposerPluginFactory() : impl_(std::make_unique<
 {
   impl_->plugin_loader.search_libraries_env = TESSERACT_TASK_COMPOSER_PLUGINS_ENV;
   impl_->plugin_loader.search_paths_env = TESSERACT_TASK_COMPOSER_PLUGIN_DIRECTORIES_ENV;
-  impl_->plugin_loader.search_paths.emplace_back(TESSERACT_TASK_COMPOSER_PLUGIN_PATH);
+  impl_->plugin_loader.search_paths.push_back(TESSERACT_TASK_COMPOSER_PLUGIN_PATH);
   if (!std::string(TESSERACT_TASK_COMPOSER_PLUGINS).empty())
     boost::split(impl_->plugin_loader.search_libraries,
                  TESSERACT_TASK_COMPOSER_PLUGINS,
                  boost::is_any_of(":"),
                  boost::token_compress_on);
-
-  tesseract_common::removeDuplicates(impl_->plugin_loader.search_paths);
-  tesseract_common::removeDuplicates(impl_->plugin_loader.search_libraries);
 }
 
 TaskComposerPluginFactory::TaskComposerPluginFactory(const tesseract_common::TaskComposerPluginInfo& config)
@@ -109,10 +106,8 @@ TaskComposerPluginFactory& TaskComposerPluginFactory::operator=(TaskComposerPlug
 
 void TaskComposerPluginFactory::loadConfig(const tesseract_common::TaskComposerPluginInfo& config)
 {
-  impl_->plugin_loader.search_libraries.insert(
-      impl_->plugin_loader.search_libraries.end(), config.search_libraries.begin(), config.search_libraries.end());
-  impl_->plugin_loader.search_paths.insert(
-      impl_->plugin_loader.search_paths.end(), config.search_paths.begin(), config.search_paths.end());
+  impl_->plugin_loader.search_libraries.insert(impl_->plugin_loader.search_libraries.end(), config.search_libraries.begin(), config.search_libraries.end());
+  impl_->plugin_loader.search_paths.insert(impl_->plugin_loader.search_paths.end(), config.search_paths.begin(), config.search_paths.end());
 
   impl_->executor_plugin_info.plugins.insert(config.executor_plugin_infos.plugins.begin(),
                                              config.executor_plugin_infos.plugins.end());
@@ -121,9 +116,6 @@ void TaskComposerPluginFactory::loadConfig(const tesseract_common::TaskComposerP
   impl_->task_plugin_info.plugins.insert(config.task_plugin_infos.plugins.begin(),
                                          config.task_plugin_infos.plugins.end());
   impl_->task_plugin_info.default_plugin = config.task_plugin_infos.default_plugin;
-
-  tesseract_common::removeDuplicates(impl_->plugin_loader.search_paths);
-  tesseract_common::removeDuplicates(impl_->plugin_loader.search_libraries);
 }
 
 void TaskComposerPluginFactory::loadConfig(YAML::Node config)
@@ -131,17 +123,11 @@ void TaskComposerPluginFactory::loadConfig(YAML::Node config)
   if (const YAML::Node& plugin_info = config[tesseract_common::TaskComposerPluginInfo::CONFIG_KEY])
   {
     auto tc_plugin_info = plugin_info.as<tesseract_common::TaskComposerPluginInfo>();
-    impl_->plugin_loader.search_paths.insert(impl_->plugin_loader.search_paths.end(),
-                                             tc_plugin_info.search_paths.begin(),
-                                             tc_plugin_info.search_paths.end());
-    impl_->plugin_loader.search_libraries.insert(impl_->plugin_loader.search_libraries.end(),
-                                                 tc_plugin_info.search_libraries.begin(),
+    impl_->plugin_loader.search_paths.insert(impl_->plugin_loader.search_paths.end(), tc_plugin_info.search_paths.begin(), tc_plugin_info.search_paths.end());
+    impl_->plugin_loader.search_libraries.insert(impl_->plugin_loader.search_libraries.end(), tc_plugin_info.search_libraries.begin(),
                                                  tc_plugin_info.search_libraries.end());
     impl_->executor_plugin_info = tc_plugin_info.executor_plugin_infos;
     impl_->task_plugin_info = tc_plugin_info.task_plugin_infos;
-
-    tesseract_common::removeDuplicates(impl_->plugin_loader.search_paths);
-    tesseract_common::removeDuplicates(impl_->plugin_loader.search_libraries);
   }
 }
 
@@ -164,28 +150,26 @@ void TaskComposerPluginFactory::loadConfig(const std::string& config, const tess
 
 void TaskComposerPluginFactory::addSearchPath(const std::string& path)
 {
-  auto& v = impl_->plugin_loader.search_paths;
-  if (std::find(v.begin(), v.end(), path) == v.end())
-    v.push_back(path);
+  impl_->plugin_loader.search_paths.push_back(path);
 }
 
-std::vector<std::string> TaskComposerPluginFactory::getSearchPaths() const
+std::set<std::string> TaskComposerPluginFactory::getSearchPaths() const
 {
-  return std::as_const(*impl_).plugin_loader.search_paths;
+  const auto& paths = std::as_const(*impl_).plugin_loader.search_paths;
+  return std::set<std::string>(paths.begin(), paths.end());
 }
 
 void TaskComposerPluginFactory::clearSearchPaths() { impl_->plugin_loader.search_paths.clear(); }
 
 void TaskComposerPluginFactory::addSearchLibrary(const std::string& library_name)
 {
-  auto& v = impl_->plugin_loader.search_libraries;
-  if (std::find(v.begin(), v.end(), library_name) == v.end())
-    v.push_back(library_name);
+  impl_->plugin_loader.search_libraries.push_back(library_name);
 }
 
-std::vector<std::string> TaskComposerPluginFactory::getSearchLibraries() const
+std::set<std::string> TaskComposerPluginFactory::getSearchLibraries() const
 {
-  return std::as_const(*impl_).plugin_loader.search_libraries;
+  const auto& libraries = std::as_const(*impl_).plugin_loader.search_libraries;
+  return std::set<std::string>(libraries.begin(), libraries.end());
 }
 
 void TaskComposerPluginFactory::clearSearchLibraries() { impl_->plugin_loader.search_libraries.clear(); }
@@ -393,8 +377,8 @@ void TaskComposerPluginFactory::saveConfig(const std::filesystem::path& file_pat
 YAML::Node TaskComposerPluginFactory::getConfig() const
 {
   tesseract_common::TaskComposerPluginInfo tc_plugins;
-  tc_plugins.search_paths = impl_->plugin_loader.search_paths;
-  tc_plugins.search_libraries = impl_->plugin_loader.search_libraries;
+  tc_plugins.search_paths = std::set<std::string>(impl_->plugin_loader.search_paths.begin(), impl_->plugin_loader.search_paths.end());
+  tc_plugins.search_libraries = std::set<std::string>(impl_->plugin_loader.search_libraries.begin(), impl_->plugin_loader.search_libraries.end());
   tc_plugins.executor_plugin_infos = impl_->executor_plugin_info;
   tc_plugins.task_plugin_infos = impl_->task_plugin_info;
 

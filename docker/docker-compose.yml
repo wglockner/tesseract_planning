@@ -5,9 +5,9 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       args:
-        - TAG=noble-0.31.0
+        - TAG=focal-0.20
     container_name: tesseract_planning
-    image: ghcr.io/tesseract-robotics/tesseract_planning_deploy:noble-0.31.0
+    image: ghcr.io/tesseract-robotics/tesseract_planning_deploy:focal-0.20
     stdin_open: true
     tty: true
     network_mode: host

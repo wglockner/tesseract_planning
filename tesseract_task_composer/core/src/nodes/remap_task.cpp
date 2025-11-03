@@ -89,10 +89,7 @@ TaskComposerNodeInfo RemapTask::runImpl(TaskComposerContext& context, OptionalTa
   for (std::size_t i = 0; i < ikeys.size(); ++i)
     remapping[ikeys[i]] = okeys[i];
 
-  // Get local data storage
-  TaskComposerDataStorage::Ptr data_storage = getDataStorage(context);
-
-  if (data_storage->remapData(remapping, copy_))
+  if (context.data_storage->remapData(remapping, copy_))
   {
     info.color = "green";
     info.return_value = 1;

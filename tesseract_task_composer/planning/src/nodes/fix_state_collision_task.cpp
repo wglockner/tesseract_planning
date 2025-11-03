@@ -169,13 +169,6 @@ bool moveWaypointFromCollisionTrajopt(WaypointPoly& waypoint,
   pci.basic_info.manip = manip_info.manipulator;
   pci.basic_info.use_time = false;
 
-  // Apply solver settings
-  auto config = std::make_unique<sco::OSQPModelConfig>();
-  config->settings = profile.osqp_settings;
-  config->update_workspace = profile.update_workspace;
-  pci.basic_info.convex_solver_config = std::move(config);
-  pci.opt_info = profile.opt_params;
-
   // Create Kinematic Object
   pci.kin = pci.env->getJointGroup(pci.basic_info.manip);
 
@@ -311,7 +304,7 @@ bool moveWaypointFromCollisionTrajopt(WaypointPoly& waypoint,
     config.contact_manager_config = profile.contact_manager_config;
     config.collision_check_config = profile.collision_check_config;
     config.collision_check_config.type = tesseract_collision::CollisionEvaluatorType::DISCRETE;
-    config.collision_coeff_data = profile.collision_constraint_coeff;
+    config.collision_coeff_data = trajopt_common::CollisionCoeffData(1);
     collision->config = { config };
     pci.cnt_infos.push_back(collision);
   }
@@ -326,7 +319,7 @@ bool moveWaypointFromCollisionTrajopt(WaypointPoly& waypoint,
     config.contact_manager_config = profile.contact_manager_config;
     config.collision_check_config = profile.collision_check_config;
     config.collision_check_config.type = tesseract_collision::CollisionEvaluatorType::DISCRETE;
-    config.collision_coeff_data = profile.collision_cost_coeff;
+    config.collision_coeff_data = trajopt_common::CollisionCoeffData(20);
     collision->config = { config };
     pci.cost_infos.push_back(collision);
   }
@@ -493,7 +486,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
   // --------------------
   // Check that inputs are valid
   // --------------------
-  auto env_poly = getData(context, INPUT_ENVIRONMENT_PORT);
+  auto env_poly = getData(*context.data_storage, INPUT_ENVIRONMENT_PORT);
   if (env_poly.getType() != std::type_index(typeid(std::shared_ptr<const tesseract_environment::Environment>)))
   {
     info.status_code = 0;
@@ -505,7 +498,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
 
   auto env = env_poly.as<std::shared_ptr<const tesseract_environment::Environment>>();
 
-  auto input_data_poly = getData(context, INOUT_PROGRAM_PORT);
+  auto input_data_poly = getData(*context.data_storage, INOUT_PROGRAM_PORT);
   if (input_data_poly.getType() != std::type_index(typeid(CompositeInstruction)))
   {
     info.status_message = "Input to FixStateCollision must be a composite instruction";
@@ -516,7 +509,8 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
   tesseract_common::AnyPoly original_input_data_poly{ input_data_poly };
 
   // Get Composite Profile
-  auto profiles = getData(context, INPUT_PROFILES_PORT).as<std::shared_ptr<tesseract_common::ProfileDictionary>>();
+  auto profiles =
+      getData(*context.data_storage, INPUT_PROFILES_PORT).as<std::shared_ptr<tesseract_common::ProfileDictionary>>();
   auto& ci = input_data_poly.as<CompositeInstruction>();
   auto cur_composite_profile = profiles->getProfile<FixStateCollisionProfile>(
       ns_, ci.getProfile(ns_), std::make_shared<FixStateCollisionProfile>());
@@ -539,7 +533,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
             // If the output key is not the same as the input key the output data should be assigned the input data for
             // error branching
             if (output_keys_.get(INOUT_PROGRAM_PORT) != input_keys_.get(INOUT_PROGRAM_PORT))
-              setData(context, INOUT_PROGRAM_PORT, original_input_data_poly);
+              setData(*context.data_storage, INOUT_PROGRAM_PORT, original_input_data_poly);
 
             // Save space
             for (auto& contact_map : contact_results)
@@ -547,7 +541,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
 
             info.status_message = "Failed to correct state in collision";
             info.data_storage.setData("contact_results", contact_results);
-            setData(context, OUTPUT_CONTACT_RESULTS_PORT, contact_results, false);
+            setData(*context.data_storage, OUTPUT_CONTACT_RESULTS_PORT, contact_results, false);
             return info;
           }
         }
@@ -578,7 +572,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
 
             info.status_message = "Failed to correct state in collision";
             info.data_storage.setData("contact_results", contact_results);
-            setData(context, OUTPUT_CONTACT_RESULTS_PORT, contact_results, false);
+            setData(*context.data_storage, OUTPUT_CONTACT_RESULTS_PORT, contact_results, false);
 
             return info;
           }
@@ -593,7 +587,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
       if (flattened.empty())
       {
         if (output_keys_.get(INOUT_PROGRAM_PORT) != input_keys_.get(INOUT_PROGRAM_PORT))
-          setData(context, INOUT_PROGRAM_PORT, original_input_data_poly);
+          setData(*context.data_storage, INOUT_PROGRAM_PORT, original_input_data_poly);
 
         info.status_code = 1;
         info.status_message = "FixStateCollisionTask found no MoveInstructions to process";
@@ -605,7 +599,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
       if (flattened.size() <= 2)
       {
         if (output_keys_.get(INOUT_PROGRAM_PORT) != input_keys_.get(INOUT_PROGRAM_PORT))
-          setData(context, INOUT_PROGRAM_PORT, original_input_data_poly);
+          setData(*context.data_storage, INOUT_PROGRAM_PORT, original_input_data_poly);
 
         info.status_code = 1;
         info.status_message = "FixStateCollisionTask found no intermediate MoveInstructions to process";
@@ -639,7 +633,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
             // If the output key is not the same as the input key the output data should be assigned the input data for
             // error branching
             if (output_keys_.get(INOUT_PROGRAM_PORT) != input_keys_.get(INOUT_PROGRAM_PORT))
-              setData(context, INOUT_PROGRAM_PORT, original_input_data_poly);
+              setData(*context.data_storage, INOUT_PROGRAM_PORT, original_input_data_poly);
 
             // Save space
             for (auto& contact_map : contact_results)
@@ -647,7 +641,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
 
             info.status_message = "Failed to correct state in collision";
             info.data_storage.setData("contact_results", contact_results);
-            setData(context, OUTPUT_CONTACT_RESULTS_PORT, contact_results, false);
+            setData(*context.data_storage, OUTPUT_CONTACT_RESULTS_PORT, contact_results, false);
             return info;
           }
         }
@@ -661,7 +655,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
       if (flattened.empty())
       {
         if (output_keys_.get(INOUT_PROGRAM_PORT) != input_keys_.get(INOUT_PROGRAM_PORT))
-          setData(context, INOUT_PROGRAM_PORT, original_input_data_poly);
+          setData(*context.data_storage, INOUT_PROGRAM_PORT, original_input_data_poly);
 
         info.status_code = 1;
         info.status_message = "FixStateCollisionTask found no MoveInstructions to process";
@@ -695,7 +689,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
             // If the output key is not the same as the input key the output data should be assigned the input data for
             // error branching
             if (output_keys_.get(INOUT_PROGRAM_PORT) != input_keys_.get(INOUT_PROGRAM_PORT))
-              setData(context, INOUT_PROGRAM_PORT, original_input_data_poly);
+              setData(*context.data_storage, INOUT_PROGRAM_PORT, original_input_data_poly);
 
             // Save space
             for (auto& contact_map : contact_results)
@@ -703,7 +697,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
 
             info.status_message = "Failed to correct state in collision";
             info.data_storage.setData("contact_results", contact_results);
-            setData(context, OUTPUT_CONTACT_RESULTS_PORT, contact_results, false);
+            setData(*context.data_storage, OUTPUT_CONTACT_RESULTS_PORT, contact_results, false);
             return info;
           }
         }
@@ -719,7 +713,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
         // If the output key is not the same as the input key the output data should be assigned the input data for
         // error branching
         if (output_keys_.get(INOUT_PROGRAM_PORT) != input_keys_.get(INOUT_PROGRAM_PORT))
-          setData(context, INOUT_PROGRAM_PORT, original_input_data_poly);
+          setData(*context.data_storage, INOUT_PROGRAM_PORT, original_input_data_poly);
 
         info.status_code = 1;
         info.status_message = "FixStateCollisionTask found no MoveInstructions to process";
@@ -753,7 +747,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
             // If the output key is not the same as the input key the output data should be assigned the input data for
             // error branching
             if (output_keys_.get(INOUT_PROGRAM_PORT) != input_keys_.get(INOUT_PROGRAM_PORT))
-              setData(context, INOUT_PROGRAM_PORT, original_input_data_poly);
+              setData(*context.data_storage, INOUT_PROGRAM_PORT, original_input_data_poly);
 
             // Save space
             for (auto& contact_map : contact_results)
@@ -761,7 +755,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
 
             info.status_message = "Failed to correct state in collision";
             info.data_storage.setData("contact_results", contact_results);
-            setData(context, OUTPUT_CONTACT_RESULTS_PORT, contact_results, false);
+            setData(*context.data_storage, OUTPUT_CONTACT_RESULTS_PORT, contact_results, false);
             return info;
           }
         }
@@ -775,7 +769,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
       if (flattened.size() <= 1)
       {
         if (output_keys_.get(INOUT_PROGRAM_PORT) != input_keys_.get(INOUT_PROGRAM_PORT))
-          setData(context, INOUT_PROGRAM_PORT, original_input_data_poly);
+          setData(*context.data_storage, INOUT_PROGRAM_PORT, original_input_data_poly);
 
         info.status_code = 1;
         info.status_message = "FixStateCollisionTask found no MoveInstructions to process";
@@ -809,7 +803,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
             // If the output key is not the same as the input key the output data should be assigned the input data for
             // error branching
             if (output_keys_.get(INOUT_PROGRAM_PORT) != input_keys_.get(INOUT_PROGRAM_PORT))
-              setData(context, INOUT_PROGRAM_PORT, original_input_data_poly);
+              setData(*context.data_storage, INOUT_PROGRAM_PORT, original_input_data_poly);
 
             // Save space
             for (auto& contact_map : contact_results)
@@ -817,7 +811,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
 
             info.status_message = "Failed to correct state in collision";
             info.data_storage.setData("contact_results", contact_results);
-            setData(context, OUTPUT_CONTACT_RESULTS_PORT, contact_results, false);
+            setData(*context.data_storage, OUTPUT_CONTACT_RESULTS_PORT, contact_results, false);
             return info;
           }
         }
@@ -827,7 +821,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
     case FixStateCollisionProfile::Settings::DISABLED:
     {
       if (output_keys_.get(INOUT_PROGRAM_PORT) != input_keys_.get(INOUT_PROGRAM_PORT))
-        setData(context, INOUT_PROGRAM_PORT, original_input_data_poly);
+        setData(*context.data_storage, INOUT_PROGRAM_PORT, original_input_data_poly);
 
       info.color = "yellow";
       info.status_code = 1;
@@ -837,7 +831,7 @@ TaskComposerNodeInfo FixStateCollisionTask::runImpl(TaskComposerContext& context
     }
   }
 
-  setData(context, INOUT_PROGRAM_PORT, input_data_poly);
+  setData(*context.data_storage, INOUT_PROGRAM_PORT, input_data_poly);
 
   info.color = "green";
   info.status_code = 1;

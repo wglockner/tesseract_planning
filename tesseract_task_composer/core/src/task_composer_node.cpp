@@ -42,7 +42,45 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 #include <tesseract_task_composer/core/task_composer_node.h>
 #include <tesseract_task_composer/core/task_composer_node_info.h>
 #include <tesseract_task_composer/core/task_composer_data_storage.h>
-#include <tesseract_task_composer/core/yaml_extensions.h>
+
+namespace YAML
+{
+template <>
+struct convert<tesseract_planning::TaskComposerKeys>
+{
+  static Node encode(const tesseract_planning::TaskComposerKeys& rhs)
+  {
+    Node node;
+    for (const auto& entry : rhs.data())
+    {
+      if (entry.second.index() == 0)
+        node[entry.first] = std::get<std::string>(entry.second);
+      else
+        node[entry.first] = std::get<std::vector<std::string>>(entry.second);
+    }
+
+    return node;
+  }
+
+  static bool decode(const Node& node, tesseract_planning::TaskComposerKeys& rhs)
+  {
+    if (!node.IsMap())
+      throw std::runtime_error("TaskComposerKeys, must be a yaml map");
+
+    for (const auto& dict : node)
+    {
+      if (dict.second.IsSequence())
+        rhs.add(dict.first.as<std::string>(), dict.second.as<std::vector<std::string>>());
+      else if (dict.second.IsScalar())
+        rhs.add(dict.first.as<std::string>(), dict.second.as<std::string>());
+      else
+        throw std::runtime_error("TaskComposerKeys, allowed port type is std::string or std::vector<std::string>");
+    }
+
+    return true;
+  }
+};
+}  // namespace YAML
 
 namespace tesseract_planning
 {
@@ -55,7 +93,6 @@ TaskComposerNode::TaskComposerNode(std::string name,
   , type_(type)
   , uuid_(boost::uuids::random_generator()())
   , uuid_str_(boost::uuids::to_string(uuid_))
-  , parent_uuid_str_(boost::uuids::to_string(parent_uuid_))
   , conditional_(conditional)
   , ports_(std::move(ports))
 {
@@ -110,27 +147,20 @@ int TaskComposerNode::run(TaskComposerContext& context, OptionalTaskComposerExec
     info.color = "grey";
     info.status_code = 0;
     info.status_message = "Aborted";
-    info.aborted = true;
-    context.task_infos->addInfo(info);
+    info.aborted_ = true;
+    context.task_infos.addInfo(info);
     return 0;
   }
 
   tesseract_common::Stopwatch stopwatch;
   TaskComposerNodeInfo results;
   stopwatch.start();
-
-  // Set the root node in task_infos
-  if (parent_uuid_.is_nil())
-    context.task_infos->setRootNode(uuid_);
-
-  bool exception_occured{ false };
   try
   {
     results = runImpl(context, executor);
   }
   catch (const std::exception& e)
   {
-    exception_occured = true;
     results = TaskComposerNodeInfo(*this);
     results.color = "red";
     results.status_code = -1;
@@ -146,15 +176,14 @@ int TaskComposerNode::run(TaskComposerContext& context, OptionalTaskComposerExec
   int value = results.return_value;
   assert(value >= 0);
 
-  // Call abort if exception or required and is a task
-  if ((exception_occured && !context.isAborted()) ||
-      (type_ == TaskComposerNodeType::TASK && trigger_abort_ && !context.isAborted()))
+  // Call abort if required and is a task
+  if (type_ == TaskComposerNodeType::TASK && trigger_abort_ && !context.isAborted())
   {
     results.status_message += " (Abort Triggered)";
     context.abort(uuid_);
   }
 
-  context.task_infos->addInfo(results);
+  context.task_infos.addInfo(results);
   return value;
 }
 
@@ -171,8 +200,6 @@ const boost::uuids::uuid& TaskComposerNode::getUUID() const { return uuid_; }
 const std::string& TaskComposerNode::getUUIDString() const { return uuid_str_; }
 
 const boost::uuids::uuid& TaskComposerNode::getParentUUID() const { return parent_uuid_; }
-
-const std::string& TaskComposerNode::getParentUUIDString() const { return parent_uuid_str_; }
 
 bool TaskComposerNode::isConditional() const { return conditional_; }
 
@@ -394,6 +421,16 @@ bool TaskComposerNode::saveDotgraph(const std::string& filepath, const ResultsMa
   return false;
 }
 
+void TaskComposerNode::renameInputKeys(const std::map<std::string, std::string>& input_keys)
+{
+  input_keys_.rename(input_keys);
+}
+
+void TaskComposerNode::renameOutputKeys(const std::map<std::string, std::string>& output_keys)
+{
+  output_keys_.rename(output_keys);
+}
+
 void TaskComposerNode::setConditional(bool enable) { conditional_ = enable; }
 
 std::string TaskComposerNode::dump(std::ostream& os,
@@ -409,7 +446,7 @@ std::string TaskComposerNode::dump(std::ostream& os,
   if (it != results_map.end())
   {
     return_value = it->second.return_value;
-    if (!it->second.aborted)
+    if (!it->second.isAborted())
       color = it->second.color;
   }
 
@@ -474,7 +511,6 @@ bool TaskComposerNode::operator==(const TaskComposerNode& rhs) const
   equal &= uuid_ == rhs.uuid_;
   equal &= uuid_str_ == rhs.uuid_str_;
   equal &= parent_uuid_ == rhs.parent_uuid_;
-  equal &= parent_uuid_str_ == rhs.parent_uuid_str_;
   equal &= outbound_edges_ == rhs.outbound_edges_;
   equal &= inbound_edges_ == rhs.inbound_edges_;
   equal &= input_keys_ == rhs.input_keys_;
@@ -495,7 +531,6 @@ void TaskComposerNode::serialize(Archive& ar, const unsigned int /*version*/)
   ar& boost::serialization::make_nvp("uuid", uuid_);
   ar& boost::serialization::make_nvp("uuid_str", uuid_str_);
   ar& boost::serialization::make_nvp("parent_uuid", parent_uuid_);
-  ar& boost::serialization::make_nvp("parent_uuid_str", parent_uuid_str_);
   ar& boost::serialization::make_nvp("outbound_edges", outbound_edges_);
   ar& boost::serialization::make_nvp("inbound_edges", inbound_edges_);
   ar& boost::serialization::make_nvp("input_keys", input_keys_);
@@ -512,24 +547,11 @@ std::string TaskComposerNode::toString(const boost::uuids::uuid& u, const std::s
   return (prefix + result);
 }
 
-TaskComposerDataStorage::Ptr TaskComposerNode::getDataStorage(const TaskComposerContext& context) const
-{
-  if (parent_uuid_.is_nil())
-    return context.data_storage;
-
-  tesseract_common::AnyPoly data_storage_any = context.data_storage->getData(parent_uuid_str_);
-  if (data_storage_any.isNull())
-    throw std::runtime_error("TaskComposerNode, unable to find parent data storage!");
-
-  return data_storage_any.as<TaskComposerDataStorage::Ptr>();
-}
-
 template <>
-tesseract_common::AnyPoly TaskComposerNode::getData(const TaskComposerContext& context,
+tesseract_common::AnyPoly TaskComposerNode::getData(const TaskComposerDataStorage& data_storage,
                                                     const std::string& port,
                                                     bool required) const
 {
-  TaskComposerDataStorage::Ptr data_storage = getDataStorage(context);
   auto it = input_keys_.data().find(port);
   if (it == input_keys_.data().end())
   {
@@ -540,7 +562,7 @@ tesseract_common::AnyPoly TaskComposerNode::getData(const TaskComposerContext& c
   }
 
   const auto& key = std::get<std::string>(it->second);
-  auto data = data_storage->getData(key);
+  auto data = data_storage.getData(key);
   if (data.isNull() && required)
     throw std::runtime_error(name_ + ", required data is missing: " + port + ":" + key);
 
@@ -548,11 +570,10 @@ tesseract_common::AnyPoly TaskComposerNode::getData(const TaskComposerContext& c
 }
 
 template <>
-std::vector<tesseract_common::AnyPoly> TaskComposerNode::getData(const TaskComposerContext& context,
+std::vector<tesseract_common::AnyPoly> TaskComposerNode::getData(const TaskComposerDataStorage& data_storage,
                                                                  const std::string& port,
                                                                  bool required) const
 {
-  TaskComposerDataStorage::Ptr data_storage = getDataStorage(context);
   auto it = input_keys_.data().find(port);
   if (it == input_keys_.data().end())
   {
@@ -566,7 +587,7 @@ std::vector<tesseract_common::AnyPoly> TaskComposerNode::getData(const TaskCompo
   std::vector<tesseract_common::AnyPoly> data_container;
   for (const auto& key : vs)
   {
-    auto data = data_storage->getData(key);
+    auto data = data_storage.getData(key);
     if (data.isNull() && required)
     {
       std::string msg(name_);
@@ -583,12 +604,11 @@ std::vector<tesseract_common::AnyPoly> TaskComposerNode::getData(const TaskCompo
   return data_container;
 }
 
-void TaskComposerNode::setData(TaskComposerContext& context,
+void TaskComposerNode::setData(TaskComposerDataStorage& data_storage,
                                const std::string& port,
                                tesseract_common::AnyPoly data,
                                bool required) const
 {
-  TaskComposerDataStorage::Ptr data_storage = getDataStorage(context);
   auto it = output_keys_.data().find(port);
   if (it == output_keys_.data().end())
   {
@@ -599,16 +619,14 @@ void TaskComposerNode::setData(TaskComposerContext& context,
   }
 
   const auto& key = std::get<std::string>(it->second);
-
-  data_storage->setData(key, std::move(data));
+  data_storage.setData(key, std::move(data));
 }
 
-void TaskComposerNode::setData(TaskComposerContext& context,
+void TaskComposerNode::setData(TaskComposerDataStorage& data_storage,
                                const std::string& port,
                                const std::vector<tesseract_common::AnyPoly>& data,
                                bool required) const
 {
-  TaskComposerDataStorage::Ptr data_storage = getDataStorage(context);
   auto it = output_keys_.data().find(port);
   if (it == output_keys_.data().end())
   {
@@ -624,7 +642,7 @@ void TaskComposerNode::setData(TaskComposerContext& context,
         name_ + ", output container and assigned data are not the same size for the provided name: " + port);
 
   for (std::size_t i = 0; i < vs.size(); ++i)
-    data_storage->setData(vs[i], data[i]);
+    data_storage.setData(vs[i], data[i]);
 }
 
 }  // namespace tesseract_planning

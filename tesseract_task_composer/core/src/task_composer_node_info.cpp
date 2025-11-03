@@ -96,11 +96,13 @@ bool TaskComposerNodeInfo::operator==(const TaskComposerNodeInfo& rhs) const
   equal &= color == rhs.color;
   equal &= dotgraph == rhs.dotgraph;
   equal &= data_storage == rhs.data_storage;
-  equal &= aborted == rhs.aborted;
+  equal &= aborted_ == rhs.aborted_;
   return equal;
 }
 
 bool TaskComposerNodeInfo::operator!=(const TaskComposerNodeInfo& rhs) const { return !operator==(rhs); }
+
+bool TaskComposerNodeInfo::isAborted() const { return aborted_; }
 
 template <class Archive>
 void TaskComposerNodeInfo::serialize(Archive& ar, const unsigned int /*version*/)
@@ -128,7 +130,7 @@ void TaskComposerNodeInfo::serialize(Archive& ar, const unsigned int /*version*/
   ar& boost::serialization::make_nvp("color", color);
   ar& boost::serialization::make_nvp("dotgraph", dotgraph);
   ar& boost::serialization::make_nvp("data_storage", data_storage);
-  ar& boost::serialization::make_nvp("aborted", aborted);
+  ar& boost::serialization::make_nvp("aborted", aborted_);
 }
 
 TaskComposerNodeInfoContainer::TaskComposerNodeInfoContainer(const TaskComposerNodeInfoContainer& other)

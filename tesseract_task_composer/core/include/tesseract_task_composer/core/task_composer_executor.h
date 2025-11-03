@@ -43,7 +43,6 @@ class TaskComposerContext;
 class TaskComposerDataStorage;
 class TaskComposerFuture;
 class TaskComposerNode;
-class TaskComposerNodeInfoContainer;
 
 class TaskComposerExecutor
 {
@@ -62,10 +61,13 @@ public:
   /**
    * @brief Execute the provided node
    * @param node The node to execute
-   * @param context The contex
+   * @param data_storage The data storage object to leverage
+   * @param dotgraph Indicate if dotgraph should be generated
    * @return The future associated with execution
    */
-  std::unique_ptr<TaskComposerFuture> run(const TaskComposerNode& node, std::shared_ptr<TaskComposerContext> context);
+  std::unique_ptr<TaskComposerFuture> run(const TaskComposerNode& node,
+                                          std::shared_ptr<TaskComposerDataStorage> data_storage,
+                                          bool dotgraph = false);
 
   /** @brief Queries the number of workers (example: number of threads) */
   virtual long getWorkerCount() const = 0;
@@ -86,11 +88,10 @@ protected:
    * @param context The context
    * @return The future associated with execution
    */
-  virtual std::unique_ptr<TaskComposerFuture> runImpl(const TaskComposerNode& node,
-                                                      std::shared_ptr<TaskComposerContext> context) = 0;
+  virtual std::unique_ptr<TaskComposerFuture> run(const TaskComposerNode& node,
+                                                  std::shared_ptr<TaskComposerContext> context) = 0;
 
 private:
-  friend class TaskComposerGraph;
   friend class boost::serialization::access;
   friend struct tesseract_common::Serialization;
   template <class Archive>

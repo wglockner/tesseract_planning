@@ -378,6 +378,8 @@ bool CarSeatExample::run()
     if (debug_)
       program.print("Program: ");
 
+    CONSOLE_BRIDGE_logInform("Freespace plan to pick seat 1 example");
+
     // Create task
     const std::string task_name = (ifopt_) ? "TrajOptIfoptPipeline" : "TrajOptPipeline";
     TaskComposerNode::UPtr task = factory.createTaskComposerNode(task_name);
@@ -390,8 +392,7 @@ bool CarSeatExample::run()
     data->setData("profiles", profiles);
 
     // Solve task
-    auto context = std::make_shared<tesseract_planning::TaskComposerContext>(task->getName(), std::move(data));
-    TaskComposerFuture::UPtr future = executor->run(*task, std::move(context));
+    TaskComposerFuture::UPtr future = executor->run(*task, std::move(data));
     future->wait();
 
     if (!future->context->isSuccessful())
@@ -478,8 +479,7 @@ bool CarSeatExample::run()
     data->setData("profiles", profiles);
 
     // Solve task
-    auto context = std::make_shared<tesseract_planning::TaskComposerContext>(task->getName(), std::move(data));
-    TaskComposerFuture::UPtr future = executor->run(*task, std::move(context));
+    TaskComposerFuture::UPtr future = executor->run(*task, std::move(data));
     future->wait();
 
     if (!future->context->isSuccessful())

@@ -39,8 +39,7 @@ public:
   BasicCartesianExample(std::shared_ptr<tesseract_environment::Environment> env,
                         std::shared_ptr<tesseract_visualization::Visualization> plotter = nullptr,
                         bool ifopt = false,
-                        bool debug = false,
-                        bool benchmark = false);
+                        bool debug = false);
 
   ~BasicCartesianExample() override = default;
   BasicCartesianExample(const BasicCartesianExample&) = default;
@@ -53,7 +52,6 @@ public:
 private:
   bool ifopt_;
   bool debug_;
-  bool benchmark_;
 };
 
 }  // namespace tesseract_examples

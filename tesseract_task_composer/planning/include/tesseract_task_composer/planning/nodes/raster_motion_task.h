@@ -63,7 +63,6 @@ public:
   // Requried
   static const std::string INOUT_PROGRAM_PORT;
   static const std::string INPUT_ENVIRONMENT_PORT;
-  static const std::string INPUT_PROFILES_PORT;
 
   struct TaskFactoryResults
   {
@@ -71,14 +70,12 @@ public:
     std::string input_key;
     std::string output_key;
   };
-  using TaskFactory =
-      std::function<TaskFactoryResults(const std::string& parent_name, const std::string& name, std::size_t index)>;
+  using TaskFactory = std::function<TaskFactoryResults(const std::string& name, std::size_t index)>;
 
   RasterMotionTask();
   explicit RasterMotionTask(std::string name,
                             std::string input_program_key,
                             std::string input_environment_key,
-                            std::string input_profiles_key,
                             std::string output_program_key,
                             bool conditional,
                             TaskFactory freespace_task_factory,

@@ -42,6 +42,7 @@ TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
 
 #include <ompl/util/RandomNumbers.h>
 
+#include <functional>
 #include <cmath>
 #include <gtest/gtest.h>
 #include <console_bridge/console.h>
@@ -63,7 +64,6 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 
 #include <tesseract_motion_planners/ompl/ompl_motion_planner.h>
 #include <tesseract_motion_planners/ompl/ompl_planner_configurator.h>
-#include <tesseract_motion_planners/ompl/yaml_extensions.h>
 #include <tesseract_motion_planners/ompl/profile/ompl_real_vector_move_profile.h>
 
 #include <tesseract_motion_planners/core/types.h>
@@ -74,6 +74,8 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 #include <tesseract_command_language/joint_waypoint.h>
 #include <tesseract_command_language/move_instruction.h>
 #include <tesseract_command_language/utils.h>
+
+#include <tesseract_motion_planners/ompl/yaml_extensions.h>
 
 using namespace tesseract_scene_graph;
 using namespace tesseract_collision;
@@ -93,22 +95,26 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLSBLConfiguratorConversionsUnit)  // NOLINT
 {
   {  // Constructor
     SBLConfigurator configurator;
+
     EXPECT_NEAR(configurator.range, 0, 1e-6);
   }
 
   const std::string yaml_string = R"(range: 1.0
                                     )";
   {  // decode
+    SBLConfigurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<SBLConfigurator>();
+    auto success = YAML::convert<SBLConfigurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
     EXPECT_NEAR(configurator.range, 1.0, 1e-6);
   }
 
   {  // encode
     SBLConfigurator configurator;
     configurator.range = 1.0;
-    YAML::Node n(configurator);
-    EXPECT_NEAR(n["range"].as<double>(), 1.0, 1e-6);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<SBLConfigurator>::encode(configurator);
+    EXPECT_NEAR(output_n["range"].as<double>(), 1.0, 1e-6);
   }
 }
 
@@ -116,6 +122,7 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLESTConfiguratorConversionsUnit)  // NOLINT
 {
   {  // Constructor
     ESTConfigurator configurator;
+
     EXPECT_NEAR(configurator.range, 0, 1e-6);
     EXPECT_NEAR(configurator.goal_bias, 0.05, 1e-6);
   }
@@ -125,8 +132,10 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLESTConfiguratorConversionsUnit)  // NOLINT
                                     goal_bias: 0.04
                                     )";
   {  // decode
+    ESTConfigurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<ESTConfigurator>();
+    auto success = YAML::convert<ESTConfigurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
     EXPECT_NEAR(configurator.range, 1.0, 1e-6);
     EXPECT_NEAR(configurator.goal_bias, 0.04, 1e-6);
   }
@@ -135,9 +144,10 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLESTConfiguratorConversionsUnit)  // NOLINT
     ESTConfigurator configurator;
     configurator.range = 1.0;
     configurator.goal_bias = 0.04;
-    YAML::Node n(configurator);
-    EXPECT_NEAR(n["range"].as<double>(), 1.0, 1e-6);
-    EXPECT_NEAR(n["goal_bias"].as<double>(), 0.04, 1e-6);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<ESTConfigurator>::encode(configurator);
+    EXPECT_NEAR(output_n["range"].as<double>(), 1.0, 1e-6);
+    EXPECT_NEAR(output_n["goal_bias"].as<double>(), 0.04, 1e-6);
   }
 }
 
@@ -145,6 +155,7 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLLBKPIECE1ConfiguratorConversionsUnit)  // NOLI
 {
   {  // Constructor
     LBKPIECE1Configurator configurator;
+
     EXPECT_NEAR(configurator.range, 0, 1e-6);
     EXPECT_NEAR(configurator.border_fraction, 0.9, 1e-6);
     EXPECT_NEAR(configurator.min_valid_path_fraction, 0.5, 1e-6);
@@ -156,8 +167,10 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLLBKPIECE1ConfiguratorConversionsUnit)  // NOLI
                                     min_valid_path_fraction: 0.05
                                     )";
   {  // decode
+    LBKPIECE1Configurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<LBKPIECE1Configurator>();
+    auto success = YAML::convert<LBKPIECE1Configurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
     EXPECT_NEAR(configurator.range, 1.0, 1e-6);
     EXPECT_NEAR(configurator.border_fraction, 0.04, 1e-6);
     EXPECT_NEAR(configurator.min_valid_path_fraction, 0.05, 1e-6);
@@ -168,10 +181,11 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLLBKPIECE1ConfiguratorConversionsUnit)  // NOLI
     configurator.range = 1.0;
     configurator.border_fraction = 0.04;
     configurator.min_valid_path_fraction = 0.05;
-    YAML::Node n(configurator);
-    EXPECT_NEAR(n["range"].as<double>(), 1.0, 1e-6);
-    EXPECT_NEAR(n["border_fraction"].as<double>(), 0.04, 1e-6);
-    EXPECT_NEAR(n["min_valid_path_fraction"].as<double>(), 0.05, 1e-6);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<LBKPIECE1Configurator>::encode(configurator);
+    EXPECT_NEAR(output_n["range"].as<double>(), 1.0, 1e-6);
+    EXPECT_NEAR(output_n["border_fraction"].as<double>(), 0.04, 1e-6);
+    EXPECT_NEAR(output_n["min_valid_path_fraction"].as<double>(), 0.05, 1e-6);
   }
 }
 
@@ -179,6 +193,7 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLBKPIECE1ConfiguratorConversionsUnit)  // NOLIN
 {
   {  // Constructor
     BKPIECE1Configurator configurator;
+
     EXPECT_NEAR(configurator.range, 0, 1e-6);
     EXPECT_NEAR(configurator.border_fraction, 0.9, 1e-6);
     EXPECT_NEAR(configurator.failed_expansion_score_factor, 0.5, 1e-6);
@@ -192,8 +207,10 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLBKPIECE1ConfiguratorConversionsUnit)  // NOLIN
                                     min_valid_path_fraction: 0.05
                                     )";
   {  // decode
+    BKPIECE1Configurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<BKPIECE1Configurator>();
+    auto success = YAML::convert<BKPIECE1Configurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
     EXPECT_NEAR(configurator.range, 1.0, 1e-6);
     EXPECT_NEAR(configurator.border_fraction, 0.04, 1e-6);
     EXPECT_NEAR(configurator.failed_expansion_score_factor, 0.6, 1e-6);
@@ -206,11 +223,12 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLBKPIECE1ConfiguratorConversionsUnit)  // NOLIN
     configurator.border_fraction = 0.04;
     configurator.failed_expansion_score_factor = 0.6;
     configurator.min_valid_path_fraction = 0.05;
-    YAML::Node n(configurator);
-    EXPECT_NEAR(n["range"].as<double>(), 1.0, 1e-6);
-    EXPECT_NEAR(n["border_fraction"].as<double>(), 0.04, 1e-6);
-    EXPECT_NEAR(n["failed_expansion_score_factor"].as<double>(), 0.6, 1e-6);
-    EXPECT_NEAR(n["min_valid_path_fraction"].as<double>(), 0.05, 1e-6);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<BKPIECE1Configurator>::encode(configurator);
+    EXPECT_NEAR(output_n["range"].as<double>(), 1.0, 1e-6);
+    EXPECT_NEAR(output_n["border_fraction"].as<double>(), 0.04, 1e-6);
+    EXPECT_NEAR(output_n["failed_expansion_score_factor"].as<double>(), 0.6, 1e-6);
+    EXPECT_NEAR(output_n["min_valid_path_fraction"].as<double>(), 0.05, 1e-6);
   }
 }
 
@@ -218,6 +236,7 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLKPIECE1ConfiguratorConversionsUnit)  // NOLINT
 {
   {  // Constructor
     KPIECE1Configurator configurator;
+
     EXPECT_NEAR(configurator.range, 0, 1e-6);
     EXPECT_NEAR(configurator.goal_bias, 0.05, 1e-6);
     EXPECT_NEAR(configurator.border_fraction, 0.9, 1e-6);
@@ -233,8 +252,10 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLKPIECE1ConfiguratorConversionsUnit)  // NOLINT
                                     min_valid_path_fraction: 0.05
                                     )";
   {  // decode
+    KPIECE1Configurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<KPIECE1Configurator>();
+    auto success = YAML::convert<KPIECE1Configurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
     EXPECT_NEAR(configurator.range, 1.0, 1e-6);
     EXPECT_NEAR(configurator.goal_bias, 0.04, 1e-6);
     EXPECT_NEAR(configurator.border_fraction, 0.04, 1e-6);
@@ -249,12 +270,13 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLKPIECE1ConfiguratorConversionsUnit)  // NOLINT
     configurator.border_fraction = 0.04;
     configurator.failed_expansion_score_factor = 0.6;
     configurator.min_valid_path_fraction = 0.05;
-    YAML::Node n(configurator);
-    EXPECT_NEAR(n["range"].as<double>(), 1.0, 1e-6);
-    EXPECT_NEAR(n["goal_bias"].as<double>(), 0.04, 1e-6);
-    EXPECT_NEAR(n["border_fraction"].as<double>(), 0.04, 1e-6);
-    EXPECT_NEAR(n["failed_expansion_score_factor"].as<double>(), 0.6, 1e-6);
-    EXPECT_NEAR(n["min_valid_path_fraction"].as<double>(), 0.05, 1e-6);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<KPIECE1Configurator>::encode(configurator);
+    EXPECT_NEAR(output_n["range"].as<double>(), 1.0, 1e-6);
+    EXPECT_NEAR(output_n["goal_bias"].as<double>(), 0.04, 1e-6);
+    EXPECT_NEAR(output_n["border_fraction"].as<double>(), 0.04, 1e-6);
+    EXPECT_NEAR(output_n["failed_expansion_score_factor"].as<double>(), 0.6, 1e-6);
+    EXPECT_NEAR(output_n["min_valid_path_fraction"].as<double>(), 0.05, 1e-6);
   }
 }
 
@@ -262,6 +284,7 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLBiTRRTConfiguratorConversionsUnit)  // NOLINT
 {
   {  // Constructor
     BiTRRTConfigurator configurator;
+
     EXPECT_NEAR(configurator.range, 0, 1e-6);
     EXPECT_NEAR(configurator.temp_change_factor, 0.1, 1e-6);
     EXPECT_EQ(configurator.cost_threshold, std::numeric_limits<double>::infinity());
@@ -279,8 +302,10 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLBiTRRTConfiguratorConversionsUnit)  // NOLINT
                                     frontier_node_ratio: 0.5
                                     )";
   {  // decode
+    BiTRRTConfigurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<BiTRRTConfigurator>();
+    auto success = YAML::convert<BiTRRTConfigurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
     EXPECT_NEAR(configurator.range, 1.0, 1e-6);
     EXPECT_NEAR(configurator.temp_change_factor, 0.04, 1e-6);
     EXPECT_NEAR(configurator.cost_threshold, 0.04, 1e-6);
@@ -297,13 +322,14 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLBiTRRTConfiguratorConversionsUnit)  // NOLINT
     configurator.init_temperature = 0.6;
     configurator.frontier_threshold = 0.05;
     configurator.frontier_node_ratio = 0.5;
-    YAML::Node n(configurator);
-    EXPECT_NEAR(n["range"].as<double>(), 1.0, 1e-6);
-    EXPECT_NEAR(n["temp_change_factor"].as<double>(), 0.04, 1e-6);
-    EXPECT_NEAR(n["cost_threshold"].as<double>(), 0.04, 1e-6);
-    EXPECT_NEAR(n["init_temperature"].as<double>(), 0.6, 1e-6);
-    EXPECT_NEAR(n["frontier_threshold"].as<double>(), 0.05, 1e-6);
-    EXPECT_NEAR(n["frontier_node_ratio"].as<double>(), 0.5, 1e-6);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<BiTRRTConfigurator>::encode(configurator);
+    EXPECT_NEAR(output_n["range"].as<double>(), 1.0, 1e-6);
+    EXPECT_NEAR(output_n["temp_change_factor"].as<double>(), 0.04, 1e-6);
+    EXPECT_NEAR(output_n["cost_threshold"].as<double>(), 0.04, 1e-6);
+    EXPECT_NEAR(output_n["init_temperature"].as<double>(), 0.6, 1e-6);
+    EXPECT_NEAR(output_n["frontier_threshold"].as<double>(), 0.05, 1e-6);
+    EXPECT_NEAR(output_n["frontier_node_ratio"].as<double>(), 0.5, 1e-6);
   }
 }
 
@@ -321,8 +347,10 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLRRTConfiguratorConversionsUnit)  // NOLINT
                                     goal_bias: 0.04
                                     )";
   {  // decode
+    RRTConfigurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<RRTConfigurator>();
+    auto success = YAML::convert<RRTConfigurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
     EXPECT_NEAR(configurator.range, 1.0, 1e-6);
     EXPECT_NEAR(configurator.goal_bias, 0.04, 1e-6);
   }
@@ -331,9 +359,10 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLRRTConfiguratorConversionsUnit)  // NOLINT
     RRTConfigurator configurator;
     configurator.range = 1.0;
     configurator.goal_bias = 0.04;
-    YAML::Node n(configurator);
-    EXPECT_NEAR(n["range"].as<double>(), 1.0, 1e-6);
-    EXPECT_NEAR(n["goal_bias"].as<double>(), 0.04, 1e-6);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<RRTConfigurator>::encode(configurator);
+    EXPECT_NEAR(output_n["range"].as<double>(), 1.0, 1e-6);
+    EXPECT_NEAR(output_n["goal_bias"].as<double>(), 0.04, 1e-6);
   }
 }
 
@@ -341,22 +370,26 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLRRTConnectConfiguratorConversionsUnit)  // NOL
 {
   {  // Constructor
     RRTConnectConfigurator configurator;
+
     EXPECT_NEAR(configurator.range, 0, 1e-6);
   }
 
   const std::string yaml_string = R"(range: 1.0
                                     )";
   {  // decode
+    RRTConnectConfigurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<RRTConnectConfigurator>();
+    auto success = YAML::convert<RRTConnectConfigurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
     EXPECT_NEAR(configurator.range, 1.0, 1e-6);
   }
 
   {  // encode
     RRTConnectConfigurator configurator;
     configurator.range = 1.0;
-    YAML::Node n(configurator);
-    EXPECT_NEAR(n["range"].as<double>(), 1.0, 1e-6);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<RRTConnectConfigurator>::encode(configurator);
+    EXPECT_NEAR(output_n["range"].as<double>(), 1.0, 1e-6);
   }
 }
 
@@ -364,6 +397,7 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLRRTstarConfiguratorConversionsUnit)  // NOLINT
 {
   {  // Constructor
     RRTstarConfigurator configurator;
+
     EXPECT_NEAR(configurator.range, 0, 1e-6);
     EXPECT_NEAR(configurator.goal_bias, 0.05, 1e-6);
     EXPECT_EQ(configurator.delay_collision_checking, true);
@@ -375,8 +409,10 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLRRTstarConfiguratorConversionsUnit)  // NOLINT
                                     delay_collision_checking: false
                                     )";
   {  // decode
+    RRTstarConfigurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<RRTstarConfigurator>();
+    auto success = YAML::convert<RRTstarConfigurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
     EXPECT_NEAR(configurator.range, 1.0, 1e-6);
     EXPECT_NEAR(configurator.goal_bias, 0.04, 1e-6);
     EXPECT_EQ(configurator.delay_collision_checking, false);
@@ -387,10 +423,11 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLRRTstarConfiguratorConversionsUnit)  // NOLINT
     configurator.range = 1.0;
     configurator.goal_bias = 0.04;
     configurator.delay_collision_checking = false;
-    YAML::Node n(configurator);
-    EXPECT_NEAR(n["range"].as<double>(), 1.0, 1e-6);
-    EXPECT_NEAR(n["goal_bias"].as<double>(), 0.04, 1e-6);
-    EXPECT_EQ(n["delay_collision_checking"].as<bool>(), false);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<RRTstarConfigurator>::encode(configurator);
+    EXPECT_NEAR(output_n["range"].as<double>(), 1.0, 1e-6);
+    EXPECT_NEAR(output_n["goal_bias"].as<double>(), 0.04, 1e-6);
+    EXPECT_EQ(output_n["delay_collision_checking"].as<bool>(), false);
   }
 }
 
@@ -398,6 +435,7 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLTRRTConfiguratorConversionsUnit)  // NOLINT
 {
   {  // Constructor
     TRRTConfigurator configurator;
+
     EXPECT_NEAR(configurator.range, 0, 1e-6);
     EXPECT_NEAR(configurator.temp_change_factor, 2.0, 1e-6);
     EXPECT_NEAR(configurator.goal_bias, 0.05, 1e-6);
@@ -415,8 +453,10 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLTRRTConfiguratorConversionsUnit)  // NOLINT
                                     frontier_node_ratio: 0.5
                                     )";
   {  // decode
+    TRRTConfigurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<TRRTConfigurator>();
+    auto success = YAML::convert<TRRTConfigurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
     EXPECT_NEAR(configurator.range, 1.0, 1e-6);
     EXPECT_NEAR(configurator.goal_bias, 0.03, 1e-6);
     EXPECT_NEAR(configurator.temp_change_factor, 0.04, 1e-6);
@@ -433,14 +473,15 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLTRRTConfiguratorConversionsUnit)  // NOLINT
     configurator.init_temperature = 0.6;
     configurator.frontier_threshold = 0.05;
     configurator.frontier_node_ratio = 0.5;
-    YAML::Node n(configurator);
-    EXPECT_NEAR(n["range"].as<double>(), 1.0, 1e-6);
-    EXPECT_NEAR(n["goal_bias"].as<double>(), 0.03, 1e-6);
-    EXPECT_NEAR(n["goal_bias"].as<double>(), 0.03, 1e-6);
-    EXPECT_NEAR(n["temp_change_factor"].as<double>(), 0.04, 1e-6);
-    EXPECT_NEAR(n["init_temperature"].as<double>(), 0.6, 1e-6);
-    EXPECT_NEAR(n["frontier_threshold"].as<double>(), 0.05, 1e-6);
-    EXPECT_NEAR(n["frontier_node_ratio"].as<double>(), 0.5, 1e-6);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<TRRTConfigurator>::encode(configurator);
+    EXPECT_NEAR(output_n["range"].as<double>(), 1.0, 1e-6);
+    EXPECT_NEAR(output_n["goal_bias"].as<double>(), 0.03, 1e-6);
+    EXPECT_NEAR(output_n["goal_bias"].as<double>(), 0.03, 1e-6);
+    EXPECT_NEAR(output_n["temp_change_factor"].as<double>(), 0.04, 1e-6);
+    EXPECT_NEAR(output_n["init_temperature"].as<double>(), 0.6, 1e-6);
+    EXPECT_NEAR(output_n["frontier_threshold"].as<double>(), 0.05, 1e-6);
+    EXPECT_NEAR(output_n["frontier_node_ratio"].as<double>(), 0.5, 1e-6);
   }
 }
 
@@ -448,22 +489,26 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLPRMConfiguratorConversionsUnit)  // NOLINT
 {
   {  // Constructor
     PRMConfigurator configurator;
+
     EXPECT_EQ(configurator.max_nearest_neighbors, 10);
   }
 
   const std::string yaml_string = R"(max_nearest_neighbors: 1
                                     )";
   {  // decode
+    PRMConfigurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<PRMConfigurator>();
+    auto success = YAML::convert<PRMConfigurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
     EXPECT_EQ(configurator.max_nearest_neighbors, 1);
   }
 
   {  // encode
     PRMConfigurator configurator;
     configurator.max_nearest_neighbors = 1;
-    YAML::Node n(configurator);
-    EXPECT_EQ(n["max_nearest_neighbors"].as<int>(), 1);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<PRMConfigurator>::encode(configurator);
+    EXPECT_EQ(output_n["max_nearest_neighbors"].as<int>(), 1);
   }
 }
 
@@ -473,15 +518,18 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLPRMstarConfiguratorConversionsUnit)  // NOLINT
     PRMstarConfigurator configurator;
   }
 
-  const std::string yaml_string{ "~" };
+  const std::string yaml_string;
   {  // decode
+    PRMstarConfigurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<PRMstarConfigurator>();
+    auto success = YAML::convert<PRMstarConfigurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
   }
 
   {  // encode
     PRMstarConfigurator configurator;
-    YAML::Node n(configurator);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<PRMstarConfigurator>::encode(configurator);
   }
 }
 
@@ -491,15 +539,18 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLLazyPRMstarConfiguratorConversionsUnit)  // NO
     LazyPRMstarConfigurator configurator;
   }
 
-  const std::string yaml_string{ "~" };
+  const std::string yaml_string;
   {  // decode
+    LazyPRMstarConfigurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<LazyPRMstarConfigurator>();
+    auto success = YAML::convert<LazyPRMstarConfigurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
   }
 
   {  // encode
     LazyPRMstarConfigurator configurator;
-    YAML::Node n(configurator);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<LazyPRMstarConfigurator>::encode(configurator);
   }
 }
 
@@ -521,8 +572,10 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLSPARSConfiguratorConversionsUnit)  // NOLINT
                                      stretch_factor: 0.3
                                     )";
   {  // decode
+    SPARSConfigurator configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<SPARSConfigurator>();
+    auto success = YAML::convert<SPARSConfigurator>::decode(n, configurator);
+    EXPECT_TRUE(success);
     EXPECT_EQ(configurator.max_failures, 1);
     EXPECT_NEAR(configurator.dense_delta_fraction, 0.5, 1e-6);
     EXPECT_NEAR(configurator.sparse_delta_fraction, 0.4, 1e-6);
@@ -536,11 +589,12 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLSPARSConfiguratorConversionsUnit)  // NOLINT
     configurator.sparse_delta_fraction = 0.4;
     configurator.stretch_factor = 0.3;
 
-    YAML::Node n(configurator);
-    EXPECT_EQ(n["max_failures"].as<int>(), 1);
-    EXPECT_NEAR(n["dense_delta_fraction"].as<double>(), 0.5, 1e-6);
-    EXPECT_NEAR(n["sparse_delta_fraction"].as<double>(), 0.4, 1e-6);
-    EXPECT_NEAR(n["stretch_factor"].as<double>(), 0.3, 1e-6);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<SPARSConfigurator>::encode(configurator);
+    EXPECT_EQ(output_n["max_failures"].as<int>(), 1);
+    EXPECT_NEAR(output_n["dense_delta_fraction"].as<double>(), 0.5, 1e-6);
+    EXPECT_NEAR(output_n["sparse_delta_fraction"].as<double>(), 0.4, 1e-6);
+    EXPECT_NEAR(output_n["stretch_factor"].as<double>(), 0.3, 1e-6);
   }
 }
 
@@ -598,8 +652,10 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLOMPLSolverConfigConversionsUnit)  // NOLINT
                                     )";
 
   {  // decode
+    OMPLSolverConfig configurator;
     YAML::Node n = YAML::Load(yaml_string);
-    auto configurator = n.as<OMPLSolverConfig>();
+    auto success = YAML::convert<OMPLSolverConfig>::decode(n, configurator);
+    EXPECT_TRUE(success);
     EXPECT_NEAR(configurator.planning_time, 2.0, 1e-6);
     EXPECT_EQ(configurator.max_solutions, 4);
     EXPECT_EQ(configurator.simplify, true);
@@ -655,7 +711,8 @@ TEST(OMPLYAMLTestFixture, OMPLYAMLOMPLSolverConfigConversionsUnit)  // NOLINT
     configurator.planners.push_back(std::static_pointer_cast<const tesseract_planning::OMPLPlannerConfigurator>(
         std::make_shared<tesseract_planning::SPARSConfigurator>()));
 
-    YAML::Node output_n(configurator);
+    YAML::Node n = YAML::Load(yaml_string);
+    YAML::Node output_n = YAML::convert<OMPLSolverConfig>::encode(configurator);
     EXPECT_NEAR(output_n["planning_time"].as<double>(), 2.0, 1e-6);
     EXPECT_EQ(output_n["max_solutions"].as<int>(), 4);
     EXPECT_EQ(output_n["simplify"].as<bool>(), true);

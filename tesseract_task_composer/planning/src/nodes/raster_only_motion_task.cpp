@@ -30,7 +30,6 @@ TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
 #include <yaml-cpp/yaml.h>
 
 #include <tesseract_common/serialization.h>
-#include <tesseract_common/yaml_utils.h>
 TESSERACT_COMMON_IGNORE_WARNINGS_POP
 
 #include <tesseract_task_composer/planning/nodes/raster_only_motion_task.h>
@@ -46,7 +45,6 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 #include <tesseract_task_composer/core/task_composer_plugin_factory.h>
 #include <tesseract_task_composer/core/task_composer_graph.h>
 #include <tesseract_task_composer/core/task_composer_node_info.h>
-#include <tesseract_task_composer/core/yaml_utils.h>
 
 #include <tesseract_command_language/composite_instruction.h>
 #include <tesseract_environment/environment.h>
@@ -54,28 +52,43 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 namespace
 {
 tesseract_planning::RasterOnlyMotionTask::TaskFactoryResults
-createTask(const YAML::Node& config,
-           const std::string& parent_name,
-           const std::string& name,
+createTask(const std::string& name,
+           const std::string& task_name,
+           const std::map<std::string, std::string>& remapping,
+           const std::vector<std::string>& indexing,
            const tesseract_planning::TaskComposerPluginFactory& plugin_factory,
            std::size_t index)
 {
-  static const std::string inout_port{ "program" };
-  tesseract_planning::RasterOnlyMotionTask::TaskFactoryResults tr;
-  tr.node = loadSubTask(parent_name, name, config, plugin_factory);
-  tr.node->setConditional(false);
-  tr.input_key = tr.node->getInputKeys().get(inout_port) + std::to_string(index);
-  tr.output_key = tr.node->getOutputKeys().get(inout_port) + std::to_string(index);
+  tesseract_planning::RasterOnlyMotionTask::TaskFactoryResults tf_results;
+  tf_results.node = plugin_factory.createTaskComposerNode(task_name);
+  tf_results.node->setName(name);
 
-  auto& graph_node = static_cast<tesseract_planning::TaskComposerGraph&>(*tr.node);
-  tesseract_planning::TaskComposerKeys override_input_keys;
-  tesseract_planning::TaskComposerKeys override_output_keys;
-  override_input_keys.add(inout_port, tr.input_key);
-  override_output_keys.add(inout_port, tr.output_key);
-  graph_node.setOverrideInputKeys(override_input_keys);
-  graph_node.setOverrideOutputKeys(override_output_keys);
+  if (!remapping.empty())
+  {
+    tf_results.node->renameInputKeys(remapping);
+    tf_results.node->renameOutputKeys(remapping);
+  }
 
-  return tr;
+  if (!indexing.empty())
+  {
+    std::map<std::string, std::string> renaming;
+    for (const auto& x : indexing)
+    {
+      std::string name = task_name;
+      name.append("_");
+      name.append(x);
+      name.append(std::to_string(index));
+      renaming[x] = name;
+    }
+
+    tf_results.node->renameInputKeys(renaming);
+    tf_results.node->renameOutputKeys(renaming);
+  }
+
+  tf_results.input_key = tf_results.node->getInputKeys().get("program");
+  tf_results.output_key = tf_results.node->getOutputKeys().get("program");
+
+  return tf_results;
 }
 }  // namespace
 
@@ -84,7 +97,6 @@ namespace tesseract_planning
 // Requried
 const std::string RasterOnlyMotionTask::INOUT_PROGRAM_PORT = "program";
 const std::string RasterOnlyMotionTask::INPUT_ENVIRONMENT_PORT = "environment";
-const std::string RasterOnlyMotionTask::INPUT_PROFILES_PORT = "profiles";
 
 RasterOnlyMotionTask::RasterOnlyMotionTask()
   : TaskComposerTask("RasterOnlyMotionTask", RasterOnlyMotionTask::ports(), true)
@@ -93,7 +105,6 @@ RasterOnlyMotionTask::RasterOnlyMotionTask()
 RasterOnlyMotionTask::RasterOnlyMotionTask(std::string name,
                                            std::string input_program_key,
                                            std::string input_environment_key,
-                                           std::string input_profiles_key,
                                            std::string output_program_key,
                                            bool is_conditional,
                                            TaskFactory raster_task_factory,
@@ -104,7 +115,6 @@ RasterOnlyMotionTask::RasterOnlyMotionTask(std::string name,
 {
   input_keys_.add(INOUT_PROGRAM_PORT, std::move(input_program_key));
   input_keys_.add(INPUT_ENVIRONMENT_PORT, std::move(input_environment_key));
-  input_keys_.add(INPUT_PROFILES_PORT, std::move(input_profiles_key));
   output_keys_.add(INOUT_PROGRAM_PORT, std::move(output_program_key));
   validatePorts();
 }
@@ -114,34 +124,140 @@ RasterOnlyMotionTask::RasterOnlyMotionTask(std::string name,
                                            const TaskComposerPluginFactory& plugin_factory)
   : TaskComposerTask(std::move(name), RasterOnlyMotionTask::ports(), config)
 {
-  static const std::set<std::string> tasks_expected_keys{ "task", "class", "config", "override" };
-  static const std::string raster_key{ "raster" };
-  static const std::string transition_key{ "transition" };
-
-  if (YAML::Node raster_config = config[raster_key])
+  if (YAML::Node raster_config = config["raster"])
   {
-    tesseract_common::checkForUnknownKeys(raster_config, tasks_expected_keys);
-    validateSubTask(name_, raster_key, raster_config);
+    std::string task_name;
+    bool has_abort_terminal_entry{ false };
+    int abort_terminal_index{ -1 };
+    std::vector<std::string> indexing;
+    std::map<std::string, std::string> remapping;
 
-    raster_task_factory_ =
-        [raster_config, &plugin_factory](const std::string& parent_name, const std::string& name, std::size_t index) {
-          return createTask(raster_config, parent_name, name, plugin_factory, index);
-        };
+    if (YAML::Node n = raster_config["task"])
+      task_name = n.as<std::string>();
+    else
+      throw std::runtime_error("RasterOnlyMotionTask, entry 'raster' missing 'task' entry");
+
+    if (YAML::Node task_config = raster_config["config"])
+    {
+      if (YAML::Node n = task_config["abort_terminal"])
+      {
+        has_abort_terminal_entry = true;
+        abort_terminal_index = n.as<int>();
+      }
+
+      if (task_config["input_remapping"])  // NOLINT
+        throw std::runtime_error("RasterOnlyMotionTask, input_remapping is no longer supported use 'remapping'");
+
+      if (task_config["output_remapping"])  // NOLINT
+        throw std::runtime_error("RasterOnlyMotionTask, output_remapping is no longer supported use 'remapping'");
+
+      if (YAML::Node n = task_config["remapping"])
+        remapping = n.as<std::map<std::string, std::string>>();
+
+      if (task_config["input_indexing"])  // NOLINT
+        throw std::runtime_error("RasterOnlyMotionTask, input_indexing is no longer supported use 'indexing'");
+
+      if (task_config["output_indexing"])  // NOLINT
+        throw std::runtime_error("RasterOnlyMotionTask, output_indexing is no longer supported use 'indexing'");
+
+      if (YAML::Node n = task_config["indexing"])
+        indexing = n.as<std::vector<std::string>>();
+      else
+        throw std::runtime_error("RasterOnlyMotionTask, entry 'raster' missing 'indexing' entry");
+    }
+    else
+    {
+      throw std::runtime_error("RasterOnlyMotionTask, entry 'raster' missing 'config' entry");
+    }
+
+    if (has_abort_terminal_entry)
+    {
+      raster_task_factory_ = [task_name, abort_terminal_index, remapping, indexing, &plugin_factory](
+                                 const std::string& name, std::size_t index) {
+        auto tr = createTask(name, task_name, remapping, indexing, plugin_factory, index);
+
+        static_cast<TaskComposerGraph&>(*tr.node).setTerminalTriggerAbortByIndex(abort_terminal_index);
+
+        return tr;
+      };
+    }
+    else
+    {
+      raster_task_factory_ = [task_name, remapping, indexing, &plugin_factory](const std::string& name,
+                                                                               std::size_t index) {
+        return createTask(name, task_name, remapping, indexing, plugin_factory, index);
+      };
+    }
   }
   else
   {
     throw std::runtime_error("RasterOnlyMotionTask: missing 'raster' entry");
   }
 
-  if (YAML::Node transition_config = config[transition_key])
+  if (YAML::Node transition_config = config["transition"])
   {
-    tesseract_common::checkForUnknownKeys(transition_config, tasks_expected_keys);
-    validateSubTask(name_, transition_key, transition_config);
+    std::string task_name;
+    bool has_abort_terminal_entry{ false };
+    int abort_terminal_index{ -1 };
+    std::vector<std::string> indexing;
+    std::map<std::string, std::string> remapping;
 
-    transition_task_factory_ = [transition_config, &plugin_factory](
-                                   const std::string& parent_name, const std::string& name, std::size_t index) {
-      return createTask(transition_config, parent_name, name, plugin_factory, index);
-    };
+    if (YAML::Node n = transition_config["task"])
+      task_name = n.as<std::string>();
+    else
+      throw std::runtime_error("RasterOnlyMotionTask, entry 'transition' missing 'task' entry");
+
+    if (YAML::Node task_config = transition_config["config"])
+    {
+      if (YAML::Node n = task_config["abort_terminal"])
+      {
+        has_abort_terminal_entry = true;
+        abort_terminal_index = n.as<int>();
+      }
+
+      if (task_config["input_remapping"])  // NOLINT
+        throw std::runtime_error("RasterOnlyMotionTask, input_remapping is no longer supported use 'remapping'");
+
+      if (task_config["output_remapping"])  // NOLINT
+        throw std::runtime_error("RasterOnlyMotionTask, output_remapping is no longer supported use 'remapping'");
+
+      if (YAML::Node n = task_config["remapping"])
+        remapping = n.as<std::map<std::string, std::string>>();
+
+      if (task_config["input_indexing"])  // NOLINT
+        throw std::runtime_error("RasterOnlyMotionTask, input_indexing is no longer supported use 'indexing'");
+
+      if (task_config["output_indexing"])  // NOLINT
+        throw std::runtime_error("RasterOnlyMotionTask, output_indexing is no longer supported use 'indexing'");
+
+      if (YAML::Node n = task_config["indexing"])
+        indexing = n.as<std::vector<std::string>>();
+      else
+        throw std::runtime_error("RasterOnlyMotionTask, entry 'transition' missing 'indexing' entry");
+    }
+    else
+    {
+      throw std::runtime_error("RasterOnlyMotionTask, entry 'transition' missing 'config' entry");
+    }
+
+    if (has_abort_terminal_entry)
+    {
+      transition_task_factory_ = [task_name, abort_terminal_index, remapping, indexing, &plugin_factory](
+                                     const std::string& name, std::size_t index) {
+        auto tr = createTask(name, task_name, remapping, indexing, plugin_factory, index);
+
+        static_cast<TaskComposerGraph&>(*tr.node).setTerminalTriggerAbortByIndex(abort_terminal_index);
+
+        return tr;
+      };
+    }
+    else
+    {
+      transition_task_factory_ = [task_name, remapping, indexing, &plugin_factory](const std::string& name,
+                                                                                   std::size_t index) {
+        return createTask(name, task_name, remapping, indexing, plugin_factory, index);
+      };
+    }
   }
   else
   {
@@ -154,7 +270,6 @@ TaskComposerNodePorts RasterOnlyMotionTask::ports()
   TaskComposerNodePorts ports;
   ports.input_required[INOUT_PROGRAM_PORT] = TaskComposerNodePorts::SINGLE;
   ports.input_required[INPUT_ENVIRONMENT_PORT] = TaskComposerNodePorts::SINGLE;
-  ports.input_required[INPUT_PROFILES_PORT] = TaskComposerNodePorts::SINGLE;
 
   ports.output_required[INOUT_PROGRAM_PORT] = TaskComposerNodePorts::SINGLE;
   return ports;
@@ -182,7 +297,7 @@ TaskComposerNodeInfo RasterOnlyMotionTask::runImpl(TaskComposerContext& context,
   // --------------------
   // Check that inputs are valid
   // --------------------
-  auto env_poly = getData(context, INPUT_ENVIRONMENT_PORT);
+  auto env_poly = getData(*context.data_storage, INPUT_ENVIRONMENT_PORT);
   if (env_poly.getType() != std::type_index(typeid(std::shared_ptr<const tesseract_environment::Environment>)))
   {
     info.status_code = 0;
@@ -196,7 +311,7 @@ TaskComposerNodeInfo RasterOnlyMotionTask::runImpl(TaskComposerContext& context,
       env_poly.as<std::shared_ptr<const tesseract_environment::Environment>>()->clone();
   info.data_storage.setData("environment", env);
 
-  auto input_data_poly = getData(context, INOUT_PROGRAM_PORT);
+  auto input_data_poly = getData(*context.data_storage, INOUT_PROGRAM_PORT);
   try
   {
     checkTaskInput(input_data_poly);
@@ -211,24 +326,7 @@ TaskComposerNodeInfo RasterOnlyMotionTask::runImpl(TaskComposerContext& context,
   auto& program = input_data_poly.template as<CompositeInstruction>();
   tesseract_common::ManipulatorInfo program_manip_info = program.getManipulatorInfo();
 
-  // Create Sub Graph Task Input and Output Keys
-  // Must copy the existing parent input/output keys, but remove program port key which will get assigned later.
-  TaskComposerGraph task_graph(name_ + " (Subgraph)", uuid_);
-  TaskComposerKeys task_input_keys{ input_keys_ };
-  TaskComposerKeys task_output_keys{ output_keys_ };
-  task_input_keys.remove(INOUT_PROGRAM_PORT);
-  task_output_keys.remove(INOUT_PROGRAM_PORT);
-
-  // Create a sub graph data storage and copy the input data relevant to this graph.
-  const TaskComposerDataStorage::Ptr parent_data_storage = getDataStorage(context);
-  auto task_graph_data_storage = std::make_shared<TaskComposerDataStorage>(uuid_str_);
-  task_graph_data_storage->copyAsInputData(*parent_data_storage, task_input_keys, {});
-
-  // Create container to store the sub graph program port keys
-  std::vector<std::string> input_keys;
-  std::vector<std::string> output_keys;
-  input_keys.reserve(program.size());
-  output_keys.reserve(program.size());
+  TaskComposerGraph task_graph;
 
   // Start Task
   auto start_task = std::make_unique<StartTask>();
@@ -259,12 +357,11 @@ TaskComposerNodeInfo RasterOnlyMotionTask::runImpl(TaskComposerContext& context,
     }
 
     const std::string task_name = "Raster #" + std::to_string(raster_idx + 1) + ": " + raster_input.getDescription();
-    auto raster_results = raster_task_factory_(name_, task_name, raster_idx + 1);
+    auto raster_results = raster_task_factory_(task_name, raster_idx + 1);
+    raster_results.node->setConditional(false);
     auto raster_uuid = task_graph.addNode(std::move(raster_results.node));
     raster_tasks.emplace_back(raster_uuid, std::make_pair(raster_results.input_key, raster_results.output_key));
-    input_keys.push_back(raster_results.input_key);
-    output_keys.push_back(raster_results.output_key);
-    task_graph_data_storage->setData(raster_results.input_key, raster_input);
+    context.data_storage->setData(raster_results.input_key, raster_input);
 
     task_graph.addEdges(start_uuid, { raster_uuid });
 
@@ -292,7 +389,8 @@ TaskComposerNodeInfo RasterOnlyMotionTask::runImpl(TaskComposerContext& context,
 
     const std::string task_name =
         "Transition #" + std::to_string(transition_idx + 1) + ": " + transition_input.getDescription();
-    auto transition_results = transition_task_factory_(name_, task_name, transition_idx + 1);
+    auto transition_results = transition_task_factory_(task_name, transition_idx + 1);
+    transition_results.node->setConditional(false);
     auto transition_uuid = task_graph.addNode(std::move(transition_results.node));
     transition_keys.emplace_back(transition_results.input_key, transition_results.output_key);
 
@@ -308,9 +406,7 @@ TaskComposerNodeInfo RasterOnlyMotionTask::runImpl(TaskComposerContext& context,
                                                                             false);
     auto transition_mux_uuid = task_graph.addNode(std::move(transition_mux_task));
 
-    input_keys.push_back(transition_results.input_key);
-    output_keys.push_back(transition_results.output_key);
-    task_graph_data_storage->setData(transition_results.input_key, transition_input);
+    context.data_storage->setData(transition_results.input_key, transition_input);
 
     task_graph.addEdges(transition_mux_uuid, { transition_uuid });
     task_graph.addEdges(prev.first, { transition_mux_uuid });
@@ -322,19 +418,15 @@ TaskComposerNodeInfo RasterOnlyMotionTask::runImpl(TaskComposerContext& context,
   if (!executor.has_value())
     throw std::runtime_error("RasterOnlyMotionTask, executor is null!");
 
-  // Set sub graph input and output keys
-  task_input_keys.add(INOUT_PROGRAM_PORT, input_keys);
-  task_output_keys.add(INOUT_PROGRAM_PORT, output_keys);
-  task_graph.setInputKeys(task_input_keys);
-  task_graph.setOutputKeys(task_output_keys);
-
-  // Store sub data storage in parent data storage
-  context.data_storage->setData(uuid_str_, task_graph_data_storage);
-
-  TaskComposerFuture::UPtr future = executor.value().get().run(task_graph, context.shared_from_this());
+  TaskComposerFuture::UPtr future = executor.value().get().run(task_graph, context.data_storage, context.dotgraph);
   future->wait();
 
-  auto info_map = context.task_infos->getInfoMap();
+  // Merge child context data into parent context
+  context.task_infos.mergeInfoMap(std::move(future->context->task_infos));
+  if (future->context->isAborted())
+    context.abort(future->context->task_infos.getAbortingNode());
+
+  auto info_map = context.task_infos.getInfoMap();
   if (context.dotgraph)
   {
     std::stringstream dot_graph;
@@ -355,7 +447,8 @@ TaskComposerNodeInfo RasterOnlyMotionTask::runImpl(TaskComposerContext& context,
   program.clear();
   for (std::size_t i = 0; i < raster_tasks.size(); ++i)
   {
-    auto segment = task_graph_data_storage->getData(raster_tasks[i].second.second).as<CompositeInstruction>();
+    CompositeInstruction segment =
+        context.data_storage->getData(raster_tasks[i].second.second).as<CompositeInstruction>();
     if (i != 0)
       segment.erase(segment.begin());
 
@@ -363,13 +456,14 @@ TaskComposerNodeInfo RasterOnlyMotionTask::runImpl(TaskComposerContext& context,
 
     if (i < raster_tasks.size() - 1)
     {
-      auto transition = task_graph_data_storage->getData(transition_keys[i].second).as<CompositeInstruction>();
+      CompositeInstruction transition =
+          context.data_storage->getData(transition_keys[i].second).as<CompositeInstruction>();
       transition.erase(transition.begin());
       program.emplace_back(transition);
     }
   }
 
-  setData(context, INOUT_PROGRAM_PORT, program);
+  setData(*context.data_storage, INOUT_PROGRAM_PORT, program);
 
   info.color = "green";
   info.status_code = 1;

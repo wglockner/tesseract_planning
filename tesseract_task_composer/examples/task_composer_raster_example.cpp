@@ -56,7 +56,7 @@ int main()
 
   // Create raster task
   TaskComposerNode::UPtr task = factory.createTaskComposerNode("RasterFtPipeline");
-  const std::string input_key = task->getInputKeys().get("planning_input");
+  const std::string input_key = task->getInputKeys().get("program");
   const std::string output_key = task->getOutputKeys().get("program");
 
   // Define profiles
@@ -75,14 +75,13 @@ int main()
 
   // Solve raster plan
   auto task_executor = factory.createTaskComposerExecutor("TaskflowExecutor");
-  auto context = std::make_shared<TaskComposerContext>(task->getName(), std::move(task_data), true);
-  TaskComposerFuture::UPtr future = task_executor->run(*task, std::move(context));
+  TaskComposerFuture::UPtr future = task_executor->run(*task, std::move(task_data), true);
   future->wait();
 
   // Save dot graph
   std::ofstream tc_out_data;
   tc_out_data.open(tesseract_common::getTempPath() + "task_composer_raster_example.dot");
-  task->dump(tc_out_data, nullptr, future->context->task_infos->getInfoMap());
+  task->dump(tc_out_data, nullptr, future->context->task_infos.getInfoMap());
   tc_out_data.close();
 
   // Plot Process Trajectory

@@ -52,12 +52,6 @@ public:
   void add(const std::string& port, std::vector<std::string> keys);
 
   /**
-   * @brief Remove port entry
-   * @param port The port to remove
-   */
-  void remove(const std::string& port);
-
-  /**
    * @brief Rename keys
    * @param keys The key renamming map
    */
@@ -104,6 +98,5 @@ private:
 
 std::ostream& operator<<(std::ostream& os, const TaskComposerKeys& keys);
 }  // namespace tesseract_planning
-
 BOOST_CLASS_EXPORT_KEY(tesseract_planning::TaskComposerKeys)
 #endif  // TESSERACT_TASK_COMPOSER_TASK_COMPOSER_KEYS_H

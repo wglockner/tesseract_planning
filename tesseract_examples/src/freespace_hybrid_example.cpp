@@ -190,6 +190,8 @@ bool FreespaceHybridExample::run()
   if (debug_)
     program.print("Program: ");
 
+  CONSOLE_BRIDGE_logInform("freespace hybrid plan example");
+
   // Create Executor
   auto executor = factory.createTaskComposerExecutor("TaskflowExecutor");
 
@@ -230,8 +232,7 @@ bool FreespaceHybridExample::run()
   data->setData("profiles", profiles);
 
   // Solve task
-  auto context = std::make_shared<tesseract_planning::TaskComposerContext>(task->getName(), std::move(data));
-  TaskComposerFuture::UPtr future = executor->run(*task, std::move(context));
+  TaskComposerFuture::UPtr future = executor->run(*task, std::move(data));
   future->wait();
 
   // Plot Process Trajectory

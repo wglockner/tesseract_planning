@@ -71,27 +71,18 @@ void copyOSQPEigenSettings(OsqpEigen::Settings& lhs, const OsqpEigen::Settings& 
   lhs.setMaxIteration(static_cast<int>(settings.max_iter));
   lhs.setAbsoluteTolerance(settings.eps_abs);
   lhs.setRelativeTolerance(settings.eps_rel);
-  lhs.setPrimalInfeasibilityTolerance(settings.eps_prim_inf);
-  lhs.setDualInfeasibilityTolerance(settings.eps_dual_inf);
+  lhs.setPrimalInfeasibilityTollerance(settings.eps_prim_inf);
+  lhs.setDualInfeasibilityTollerance(settings.eps_dual_inf);
   lhs.setAlpha(settings.alpha);
   lhs.setLinearSystemSolver(settings.linsys_solver);
   lhs.setDelta(settings.delta);
-  lhs.setPolish(static_cast<bool>(settings.polishing));
+  lhs.setPolish(static_cast<bool>(settings.polish));
   lhs.setPolishRefineIter(static_cast<int>(settings.polish_refine_iter));
   lhs.setVerbosity(static_cast<bool>(settings.verbose));
   lhs.setScaledTerimination(static_cast<bool>(settings.scaled_termination));
   lhs.setCheckTermination(static_cast<int>(settings.check_termination));
-  lhs.setWarmStart(static_cast<bool>(settings.warm_starting));
+  lhs.setWarmStart(static_cast<bool>(settings.warm_start));
   lhs.setTimeLimit(settings.time_limit);
-  lhs.setAllocateSolution(static_cast<bool>(settings.allocate_solution));
-  lhs.setCgMaxIter(static_cast<int>(settings.cg_max_iter));
-  lhs.setCgPrecond(settings.cg_precond);
-  lhs.setCgTolFraction(settings.cg_tol_fraction);
-  lhs.setCgTolReduction(static_cast<int>(settings.cg_tol_reduction));
-  lhs.setCheckDualGap(static_cast<bool>(settings.check_dualgap));
-  lhs.setDevice(static_cast<int>(settings.device));
-  lhs.setProfilerLevel(static_cast<int>(settings.profiler_level));
-  lhs.setRhoIsVec(static_cast<bool>(settings.rho_is_vec));
 }
 
 std::shared_ptr<ifopt::ConstraintSet>
